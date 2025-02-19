@@ -117,7 +117,7 @@ describe('users endpoint', () => {
       });
 
       expect(res.status).toBe(404);
-      expect(res.body.message).toEqual('User is not found');
+      expect(res.body.message).toEqual('User not found');
     });
 
     it('should return error 400 if specified password is incorrect', async () => {

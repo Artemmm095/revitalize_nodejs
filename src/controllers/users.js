@@ -77,11 +77,10 @@ const getAllUsers = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    // const isValidEmail = validateEmail(email); ??? Is email validation needed in loginUser?
     const user = await db.users.getByEmail(email);
 
     if (!user) {
-      return res.status(404).json({ message: 'User is not found' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
