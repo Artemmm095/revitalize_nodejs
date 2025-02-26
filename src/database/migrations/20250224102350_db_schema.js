@@ -68,9 +68,9 @@ exports.up = (knex) => knex.schema
  */
 
 exports.down = (knex) => knex.schema
-  .dropTable('users')
+  .dropTable('workouts_metrics')
+  .dropTable('workouts')
+  .dropTable('activities_metrics')
   .dropTable('activities')
   .dropTable('metrics')
-  .dropTable('activities_metrics')
-  .dropTable('workouts')
-  .dropTable('workouts_metrics');
+  .dropTable('users');
