@@ -3,8 +3,8 @@
  * @returns { Promise<void> }
  */
 
-exports.up = (knex) => {
-  knex.schema.createTable('users', (table) => {
+exports.up = (knex) => knex.schema
+  .createTable('users', (table) => {
     table.increments('user_id');
     table.string('first_name').notNullable();
     table.string('last_name').notNullable();
@@ -13,9 +13,28 @@ exports.up = (knex) => {
     table.string('country').notNullable();
     table.text('avatar');
     table.timestamps(true, true);
-  });
-
-  knex.schema.createTable('workouts', (table) => {
+  })
+  .createTable('activities', (table) => {
+    table.increments('activity_id');
+    table.string('name').notNullable().unique();
+  })
+  .createTable('metrics', (table) => {
+    table.increments('metric_id');
+    table.string('name').notNullable().unique();
+    table.string('units').notNullable();
+  })
+  .createTable('activities_metrics', (table) => {
+    table.integer('activity_id').unsigned().notNullable()
+      .references('activity_id')
+      .inTable('activities')
+      .onDelete('CASCADE');
+    table.integer('metric_id').unsigned().notNullable()
+      .references('metric_id')
+      .inTable('metrics')
+      .onDelete('CASCADE');
+    table.primary(['activity_id', 'metric_id']);
+  })
+  .createTable('workouts', (table) => {
     table.increments('workout_id');
     table.integer('user_id').unsigned().notNullable()
       .references('user_id')
@@ -29,32 +48,8 @@ exports.up = (knex) => {
     table.text('commentary');
     table.time('duration', 0).notNullable();
     table.timestamps(true, true);
-  });
-
-  knex.schema.createTable('activities', (table) => {
-    table.increments('activity_id');
-    table.string('name').notNullable().unique();
-  });
-
-  knex.schema.createTable('metrics', (table) => {
-    table.increments('metric_id');
-    table.string('name').notNullable().unique();
-    table.string('units').notNullable();
-  });
-
-  knex.schema.createTable('activities_metrics', (table) => {
-    table.integer('activity_id').unsigned().notNullable()
-      .references('activity_id')
-      .inTable('activities')
-      .onDelete('CASCADE');
-    table.integer('metric_id').unsigned().notNullable()
-      .references('metric_id')
-      .inTable('metrics')
-      .onDelete('CASCADE');
-    table.primary(['activity_id', 'metric_id']);
-  });
-
-  knex.schema.createTable('workouts_metrics', (table) => {
+  })
+  .createTable('workouts_metrics', (table) => {
     table.integer('workout_id').unsigned().notNullable()
       .references('workout_id')
       .inTable('workouts')
@@ -66,18 +61,16 @@ exports.up = (knex) => {
     table.decimal('metric_value', 10, 2).notNullable();
     table.primary(['workout_id', 'metric_id']);
   });
-};
 
 /**
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
 
-exports.down = (knex) => {
-  knex.schema.dropTable('users');
-  knex.schema.dropTable('workouts');
-  knex.schema.dropTable('activities');
-  knex.schema.dropTable('metrics');
-  knex.schema.dropTable('activities_metrics');
-  knex.schema.dropTable('workouts_metrics');
-};
+exports.down = (knex) => knex.schema
+  .dropTable('users')
+  .dropTable('activities')
+  .dropTable('metrics')
+  .dropTable('activities_metrics')
+  .dropTable('workouts')
+  .dropTable('workouts_metrics');
