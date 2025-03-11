@@ -22,6 +22,7 @@ const auth = (req, res, next) => {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 

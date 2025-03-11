@@ -47,17 +47,17 @@ const createUser = async (req, res) => {
       return res.status(201).send({ message: 'User created' });
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error(e);
     if (e.code === '23505') {
       return res
         .status(400)
         .json({ message: 'User with provided email already exists' });
     }
+    // eslint-disable-next-line no-console
+    console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// eslint-disable-next-line consistent-return
 const getAllUsers = async (req, res) => {
   try {
     const rows = await db.users.getAll();
@@ -70,6 +70,7 @@ const getAllUsers = async (req, res) => {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -107,11 +108,89 @@ const loginUser = async (req, res) => {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+const editProfile = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      country,
+    } = req.body;
+    const { userId } = req.params;
+
+    const user = await db.users.getById(userId);
+
+    await db.users.updateProfile({
+      userId,
+      firstName: firstName || user.firstName,
+      lastName: lastName || user.lastName,
+      email: email || user.email,
+      country: country || user.country,
+    });
+
+    return res.status(200).json({ message: 'Profile edited' });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const updatePassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const { userId } = req.params;
+
+    await db.users.updatePassword({
+      userId,
+      password: await bcrypt.hash(password, 10),
+    });
+
+    return res.status(200).json({ message: 'Password updated' });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const updateAvatar = async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    const { userId } = req.params;
+
+    await db.users.updateAvatar({
+      userId,
+      avatar,
+    });
+
+    return res.status(200).json({ message: 'Avatar updated' });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(e);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// const passwordRecovery = async (req, res) => {
+//   try {
+//     //
+//   } catch (e) {
+//     // eslint-disable-next-line no-console
+//     console.error(e);
+//     return res.status(500).json({ message: 'Internal server error' });
+//   }
+// };
 
 module.exports = {
   getAllUsers,
   createUser,
   loginUser,
+  editProfile,
+  updatePassword,
+  updateAvatar,
 };

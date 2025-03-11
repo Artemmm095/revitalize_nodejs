@@ -10,22 +10,36 @@ const user = {
   lastName: 'Doe',
   email: 'user1@example.com',
   password: 'P@ssword1',
-  image: 'img.png',
+  avatar: 'img.png',
   country: 'UA',
 };
 
+let token;
+
+// const cleanTable = async () => db('users').truncate();
 const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
 
-const addUserToDB = async ({ email, password }) => db.raw(
-  `INSERT INTO users
-         (first_name, last_name, email, password, country)
-       VALUES
-         ('John', 'Doe', :email, :password, 'UA')`,
-  {
-    email,
-    password: await bcrypt.hash(password, 10),
-  },
-);
+const addUserToDB = async ({ email, password }) => db('users').insert({
+  first_name: 'John',
+  last_name: 'Doe',
+  email,
+  password: await bcrypt.hash(password, 10),
+  country: 'UA',
+});
+
+const loginUser = async () => {
+  await addUserToDB({
+    email: user.email,
+    password: user.password,
+  });
+
+  const loginRes = await request.post('/users/login').send({
+    email: user.email,
+    password: user.password,
+  });
+
+  token = loginRes.body.token;
+};
 
 describe('users endpoint', () => {
   describe('POST /create', () => {
@@ -161,7 +175,7 @@ describe('users endpoint', () => {
 
       expect(res.status).toBe(200);
 
-      const usersFromDB = await db.select('*').from('users');
+      const usersFromDB = await db('users');
 
       const normalizedUsersFromDB = usersFromDB.map((userObject) => ({
         ...userObject,
@@ -170,6 +184,16 @@ describe('users endpoint', () => {
       }));
 
       expect(res.body.users).toEqual(normalizedUsersFromDB);
+    });
+  });
+
+  describe('PATCH /edit', () => {
+    beforeAll(async () => {
+      await cleanTable();
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
     });
   });
 });
