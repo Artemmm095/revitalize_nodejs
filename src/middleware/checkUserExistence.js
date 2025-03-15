@@ -12,9 +12,9 @@ const checkUserExistence = async (req, res, next) => {
     }
 
     next();
-  } catch (e) {
+  } catch (err) {
     // eslint-disable-next-line no-console
-    console.error(e);
+    console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };

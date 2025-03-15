@@ -1,10 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
-const {
-  validateEmail,
-  validatePassword,
-} = require('../handlers/validation');
 
 // eslint-disable-next-line consistent-return
 const createUser = async (req, res) => {
@@ -17,22 +13,6 @@ const createUser = async (req, res) => {
       country,
       avatar = null,
     } = req.body;
-
-    const isValidEmail = validateEmail(email);
-    const isValidPassword = validatePassword(password);
-
-    if (!isValidEmail) {
-      return res
-        .status(400)
-        .json({ message: 'Email should be in the format `username@example.com`' });
-    }
-    if (!isValidPassword) {
-      return res
-        .status(400)
-        .json({
-          message: 'Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits',
-        });
-    }
 
     const { rowCount } = await db.users.create({
       firstName,
@@ -47,11 +27,6 @@ const createUser = async (req, res) => {
       return res.status(201).send({ message: 'User created' });
     }
   } catch (e) {
-    if (e.code === '23505') {
-      return res
-        .status(400)
-        .json({ message: 'User with provided email already exists' });
-    }
     // eslint-disable-next-line no-console
     console.error(e);
     return res.status(500).json({ message: 'Internal server error' });
@@ -142,12 +117,20 @@ const editProfile = async (req, res) => {
 
 const updatePassword = async (req, res) => {
   try {
-    const { password } = req.body;
+    const { currentPassword, newPassword } = req.body;
     const { userId } = req.params;
+
+    const user = await db.users.getById(userId);
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!passwordMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
 
     await db.users.updatePassword({
       userId,
-      password: await bcrypt.hash(password, 10),
+      password: await bcrypt.hash(newPassword, 10),
     });
 
     return res.status(200).json({ message: 'Password updated' });
