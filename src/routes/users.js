@@ -1,7 +1,7 @@
 const express = require('express');
 const { usersController } = require('../controllers');
 const { checkAuth } = require('../middleware/checkAuth');
-const { checkUserExistence } = require('../middleware/checkUserExistence');
+const { checkUserById, checkUserByEmail } = require('../middleware/checkUserExistence');
 const { validateEmail, validatePassword } = require('../middleware/validators/users');
 const { handleUniquenessConstraint } = require('../middleware/handleUniquenessConstraint');
 
@@ -11,7 +11,7 @@ router.post(
   '/create',
   validateEmail,
   validatePassword,
-  handleUniquenessConstraint,
+  // handleUniquenessConstraint,
   usersController.createUser,
 );
 
@@ -24,22 +24,23 @@ router.post(
   '/login',
   validateEmail,
   validatePassword,
+  checkUserByEmail,
   usersController.loginUser,
 );
 
 router.patch(
   '/:userId/editProfile',
   checkAuth,
-  checkUserExistence,
+  checkUserById,
   validateEmail,
-  handleUniquenessConstraint,
-  usersController.editProfile,
+  // handleUniquenessConstraint,
+  usersController.updateProfile,
 );
 
 router.patch(
   '/:userId/updatePassword',
   checkAuth,
-  checkUserExistence,
+  checkUserById,
   validatePassword,
   usersController.updatePassword,
 );
@@ -47,8 +48,10 @@ router.patch(
 router.patch(
   '/:userId/updateAvatar',
   checkAuth,
-  checkUserExistence,
+  checkUserById,
   usersController.updateAvatar,
 );
+
+router.use(handleUniquenessConstraint);
 
 module.exports = router;
