@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { extractToken } = require('../handlers/extractToken');
+const { extractToken } = require('../utils/extractToken');
 
 // eslint-disable-next-line consistent-return
 const checkAuth = (req, res, next) => {

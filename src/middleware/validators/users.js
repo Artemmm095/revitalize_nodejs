@@ -1,5 +1,5 @@
 const { body } = require('express-validator');
-const { passwordMatch } = require('../../handlers/stringPatternsMatch');
+const { passwordMatch } = require('../../utils/stringPatternsMatch');
 
 const validateEmail = body('email')
   .normalizeEmail()

@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 const db = require('../database');
+const { sendEmail } = require('../utils/emailService');
 
 // eslint-disable-next-line consistent-return
 const createUser = async (req, res) => {
@@ -177,7 +177,7 @@ const updateAvatar = async (req, res) => {
   }
 };
 
-const sendPasswordRecoveryLetter = async (req, res) => {
+const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -193,10 +193,17 @@ const sendPasswordRecoveryLetter = async (req, res) => {
       },
     );
 
+    const passwordResetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await sendEmail(
+      email,
+      'Password reset',
+      `Click here to reset your password: ${passwordResetLink}`,
+    );
+
     return res.status(200)
       .json({
-        message: 'The password recovery letter was sent to your inbox',
-        token,
+        message: 'The password reset letter was sent to your inbox',
       });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -208,8 +215,16 @@ const sendPasswordRecoveryLetter = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const { password } = req.body;
-    const { userId } = req.user;
+    const { token, password } = req.body;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const { userId } = decodedToken;
+
+    const user = await db.users.getById(userId);
+
+    if (!user) {
+      return res.status(403)
+        .json({ message: 'Invalid or expired token' });
+    }
 
     await db.users.updatePassword({
       userId,
@@ -217,7 +232,7 @@ const resetPassword = async (req, res) => {
     });
 
     return res.status(200)
-      .json({ message: 'Password recovered' });
+      .json({ message: 'Password was successfully reset' });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
@@ -233,4 +248,6 @@ module.exports = {
   updateProfile,
   updatePassword,
   updateAvatar,
+  requestPasswordReset,
+  resetPassword,
 };

@@ -52,6 +52,10 @@ router.patch(
   usersController.updateAvatar,
 );
 
+router.post();
+
+router.patch();
+
 router.use(handleUniquenessConstraint);
 
 module.exports = router;
