@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 const { sendEmail } = require('../utils/emailService');
+const { extractToken } = require('../utils/extractToken');
 
 // eslint-disable-next-line consistent-return
 const createUser = async (req, res) => {
@@ -195,15 +196,25 @@ const requestPasswordReset = async (req, res) => {
 
     const passwordResetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
+    const plainTextMessage = `Follow the link below to reset your password:
+    ${passwordResetLink}
+    If you didn’t request a password reset, ignore this email.`;
+
+    const htmlMessage = `
+    <p>Follow the link below to reset your password:</p>
+    <p><a href="${passwordResetLink}">${passwordResetLink}</a></p>
+    <p>If you didn’t request a password reset, ignore this email.</p>`;
+
     await sendEmail(
       email,
       'Password reset',
-      `Click here to reset your password: ${passwordResetLink}`,
+      plainTextMessage,
+      htmlMessage,
     );
 
     return res.status(200)
       .json({
-        message: 'The password reset letter was sent to your inbox',
+        message: 'The password reset letter has been sent to your inbox',
       });
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -215,7 +226,14 @@ const requestPasswordReset = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { password } = req.body;
+    const token = extractToken(req);
+
+    if (!token) {
+      return res.status(401)
+        .json({ message: 'No permission' });
+    }
+
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     const { userId } = decodedToken;
 
@@ -232,7 +250,7 @@ const resetPassword = async (req, res) => {
     });
 
     return res.status(200)
-      .json({ message: 'Password was successfully reset' });
+      .json({ message: 'Password has been successfully reset' });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
