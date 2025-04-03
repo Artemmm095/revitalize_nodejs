@@ -2,13 +2,13 @@ const jwt = require('jsonwebtoken');
 const { extractToken } = require('../utils/extractToken');
 
 // eslint-disable-next-line consistent-return
-const checkAuth = (req, res, next) => {
+const verifyPasswordResetToken = (req, res, next) => {
   try {
     const token = extractToken(req);
 
     if (!token) {
       return res.status(401)
-        .json({ message: 'Unauthorized user' });
+        .json({ message: 'No permission' });
     }
 
     // eslint-disable-next-line consistent-return
@@ -16,11 +16,11 @@ const checkAuth = (req, res, next) => {
       if (err) {
         if (err.name === 'TokenExpiredError') {
           return res.status(403)
-            .json({ message: 'Expired authorization token' });
+            .json({ message: 'Expired password reset token' });
         }
         if (err.name === 'JsonWebTokenError') {
           return res.status(403)
-            .json({ message: 'Invalid authorization token' });
+            .json({ message: 'Invalid password reset token' });
         }
         // eslint-disable-next-line no-console
         console.error(err);
@@ -40,5 +40,5 @@ const checkAuth = (req, res, next) => {
 };
 
 module.exports = {
-  checkAuth,
+  verifyPasswordResetToken,
 };

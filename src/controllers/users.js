@@ -2,7 +2,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 const { sendEmail } = require('../utils/emailService');
-const { extractToken } = require('../utils/extractToken');
 
 // eslint-disable-next-line consistent-return
 const createUser = async (req, res) => {
@@ -213,9 +212,7 @@ const requestPasswordReset = async (req, res) => {
     );
 
     return res.status(200)
-      .json({
-        message: 'The password reset letter has been sent to your inbox',
-      });
+      .json({ message: 'The password reset letter has been sent to your inbox' });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(e);
@@ -227,21 +224,12 @@ const requestPasswordReset = async (req, res) => {
 const resetPassword = async (req, res) => {
   try {
     const { password } = req.body;
-    const token = extractToken(req);
-
-    if (!token) {
-      return res.status(401)
-        .json({ message: 'No permission' });
-    }
-
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const { userId } = decodedToken;
+    const { userId } = req.user;
 
     const user = await db.users.getById(userId);
 
-    if (!user) {
-      return res.status(403)
-        .json({ message: 'Invalid or expired token' });
+    if (user.password_reset_token_used) {
+      return res.status(403).json({ message: 'The password reset has already been used' });
     }
 
     await db.users.updatePassword({

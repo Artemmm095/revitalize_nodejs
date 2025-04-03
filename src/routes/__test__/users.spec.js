@@ -1,5 +1,6 @@
 const supertest = require('supertest');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const { db } = require('../../database/db');
 
@@ -13,8 +14,14 @@ const user = {
   avatar: 'img.png',
   country: 'UA',
 };
-
-let token;
+const updatedUser = {
+  firstName: 'Jack',
+  lastName: 'Johnson',
+  email: 'user12345@example.com',
+  password: 'P@ssword123',
+  avatar: 'new_img.png',
+  country: 'US',
+};
 
 // const cleanTable = async () => db('users').truncate();
 const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
@@ -27,19 +34,32 @@ const addUserToDB = async ({ email, password }) => db('users').insert({
   country: 'UA',
 });
 
-const loginUser = async () => {
-  await addUserToDB({
-    email: user.email,
-    password: user.password,
-  });
+const getTestUserId = async () => {
+  const user = await db('users').first();
 
-  const loginRes = await request.post('/users/login').send({
-    email: user.email,
-    password: user.password,
-  });
-
-  token = loginRes.body.token;
+  return user.user_id;
 };
+
+const token = jwt.sign(
+  {
+    userId: getTestUserId(),
+    email: user.email,
+  },
+  process.env.JWT_SECRET,
+  {
+    expiresIn: '1h',
+  },
+);
+const expiredToken = jwt.sign(
+  {
+    userId: getTestUserId(),
+    email: user.email,
+  },
+  process.env.JWT_SECRET,
+  {
+    expiresIn: '-1h',
+  },
+);
 
 describe('users endpoint', () => {
   describe('POST /create', () => {
@@ -62,9 +82,10 @@ describe('users endpoint', () => {
         .where('email', user.email).first();
 
       const expectedUser = {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
       };
 
       expect(userFromDB).toMatchObject(expectedUser);
@@ -188,12 +209,119 @@ describe('users endpoint', () => {
   });
 
   describe('PATCH /edit', () => {
-    beforeAll(async () => {
+    beforeEach(async () => {
       await cleanTable();
       await addUserToDB({
         email: user.email,
         password: user.password,
       });
+    });
+
+    it('should update user profile (all available fields)', async () => {
+      const res = await request.post('/users/1/update-profile').send({
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Profile updated');
+
+      const userId = getTestUserId();
+      const userFromDB = await db.select(
+        'first_name as firstName',
+        'last_name as lastName',
+        'email',
+        'country',
+      )
+        .from('users')
+        .where('user_id', userId).first();
+
+      const expectedUser = {
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      };
+
+      expect(userFromDB).toMatchObject(expectedUser);
+    });
+
+    it('should update user profile (only email field)', async () => {
+      const res = await request.post('/users/1/update-profile').send({
+        email: updatedUser.email,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Profile updated');
+
+      const userId = getTestUserId();
+      const userFromDB = await db.select(
+        'first_name as firstName',
+        'last_name as lastName',
+        'email',
+        'country',
+      )
+        .from('users')
+        .where('user_id', userId).first();
+
+      const expectedUser = {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: updatedUser.email,
+        country: user.country,
+      };
+
+      expect(userFromDB).toMatchObject(expectedUser);
+    });
+
+    it('should return error 401 if request has no token', async () => {
+      const res = await request.patch('/users/1/update-profile').send({
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Unauthorized user');
+    });
+
+    it('should return error 401 if request has invalid token', async () => {
+      const res = await request.patch('/users/1/update-profile').send({
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      }).set('Authorization', 'Invalid_token');
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Invalid authorization token');
+    });
+
+    it('should return error 401 if request has expired token', async () => {
+      const res = await request.patch('/users/1/update-profile').send({
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      }).set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Expired authorization token');
+    });
+
+    it('should return error 404 if user not found', async () => {
+      const res = await request.post('/users/2/update-profile').send({
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        country: updatedUser.country,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toEqual('User not found');
     });
   });
 });
