@@ -176,7 +176,7 @@ describe('users endpoint', () => {
       await cleanTable();
     });
 
-    it('should return error 404 if users are not found', async () => {
+    it('should return error 404 if users not found', async () => {
       const res = await request.get('/users/');
 
       expect(res.status).toBe(404);
@@ -288,10 +288,7 @@ describe('users endpoint', () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
         email: updatedUser.email,
-        country: updatedUser.country,
       });
 
       expect(res.status).toBe(401);
@@ -302,10 +299,7 @@ describe('users endpoint', () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
         email: updatedUser.email,
-        country: updatedUser.country,
       }).set('Authorization', 'Invalid_token');
 
       expect(res.status).toBe(403);
@@ -316,10 +310,7 @@ describe('users endpoint', () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
         email: updatedUser.email,
-        country: updatedUser.country,
       }).set('Authorization', `Bearer ${expiredToken}`);
 
       expect(res.status).toBe(403);
@@ -328,10 +319,7 @@ describe('users endpoint', () => {
 
     it('should return error 404 if user not found', async () => {
       const res = await request.post('/users/9999/update-profile').send({
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
         email: updatedUser.email,
-        country: updatedUser.country,
       }).set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(404);
