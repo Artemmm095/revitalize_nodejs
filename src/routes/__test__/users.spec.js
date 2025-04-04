@@ -213,7 +213,7 @@ describe('users endpoint', () => {
     });
   });
 
-  describe('PATCH /edit', () => {
+  describe('PATCH /update-profile', () => {
     beforeEach(async () => {
       await cleanTable();
       await addUserToDB({
