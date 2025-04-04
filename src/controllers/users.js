@@ -226,12 +226,6 @@ const resetPassword = async (req, res) => {
     const { password } = req.body;
     const { userId } = req.user;
 
-    const user = await db.users.getById(userId);
-
-    if (user.password_reset_token_used) {
-      return res.status(403).json({ message: 'The password reset has already been used' });
-    }
-
     await db.users.updatePassword({
       userId,
       password: await bcrypt.hash(password, 10),

@@ -23,8 +23,16 @@ const updatedUser = {
   country: 'US',
 };
 
-// const cleanTable = async () => db('users').truncate();
+let token;
+let expiredToken;
+
 const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
+
+const getTestUserId = async () => {
+  const user = await db('users').first();
+
+  return user.user_id;
+};
 
 const addUserToDB = async ({ email, password }) => db('users').insert({
   first_name: 'John',
@@ -34,32 +42,30 @@ const addUserToDB = async ({ email, password }) => db('users').insert({
   country: 'UA',
 });
 
-const getTestUserId = async () => {
-  const user = await db('users').first();
+const loginUser = async () => {
+  const userId = await getTestUserId();
 
-  return user.user_id;
+  token = jwt.sign(
+    {
+      userId,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '1h',
+    },
+  );
+  expiredToken = jwt.sign(
+    {
+      userId,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '-1h',
+    },
+  );
 };
-
-const token = jwt.sign(
-  {
-    userId: getTestUserId(),
-    email: user.email,
-  },
-  process.env.JWT_SECRET,
-  {
-    expiresIn: '1h',
-  },
-);
-const expiredToken = jwt.sign(
-  {
-    userId: getTestUserId(),
-    email: user.email,
-  },
-  process.env.JWT_SECRET,
-  {
-    expiresIn: '-1h',
-  },
-);
 
 describe('users endpoint', () => {
   describe('POST /create', () => {
@@ -91,7 +97,7 @@ describe('users endpoint', () => {
       expect(userFromDB).toMatchObject(expectedUser);
     });
 
-    it('should return error 400 if email already exists', async () => {
+    it('should return error 400 if user with provided email already exists', async () => {
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -100,7 +106,7 @@ describe('users endpoint', () => {
       const res = await request.post('/users/create').send(user);
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toEqual('User with provided email already exists');
+      expect(res.body.message).toEqual('Email is already in use');
     });
 
     it('should return error 400 if email is invalid', async () => {
@@ -150,7 +156,6 @@ describe('users endpoint', () => {
         email: 'nonexistentemail@example.com',
         password: user.password,
       });
-
       expect(res.status).toBe(404);
       expect(res.body.message).toEqual('User not found');
     });
@@ -215,10 +220,13 @@ describe('users endpoint', () => {
         email: user.email,
         password: user.password,
       });
+      await loginUser();
     });
 
     it('should update user profile (all available fields)', async () => {
-      const res = await request.post('/users/1/update-profile').send({
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-profile`).send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
@@ -228,7 +236,6 @@ describe('users endpoint', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Profile updated');
 
-      const userId = getTestUserId();
       const userFromDB = await db.select(
         'first_name as firstName',
         'last_name as lastName',
@@ -249,14 +256,15 @@ describe('users endpoint', () => {
     });
 
     it('should update user profile (only email field)', async () => {
-      const res = await request.post('/users/1/update-profile').send({
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
       }).set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Profile updated');
 
-      const userId = getTestUserId();
       const userFromDB = await db.select(
         'first_name as firstName',
         'last_name as lastName',
@@ -277,7 +285,9 @@ describe('users endpoint', () => {
     });
 
     it('should return error 401 if request has no token', async () => {
-      const res = await request.patch('/users/1/update-profile').send({
+      const userId = await getTestUserId();
+
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
@@ -289,7 +299,9 @@ describe('users endpoint', () => {
     });
 
     it('should return error 401 if request has invalid token', async () => {
-      const res = await request.patch('/users/1/update-profile').send({
+      const userId = await getTestUserId();
+
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
@@ -301,7 +313,9 @@ describe('users endpoint', () => {
     });
 
     it('should return error 401 if request has expired token', async () => {
-      const res = await request.patch('/users/1/update-profile').send({
+      const userId = await getTestUserId();
+
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
@@ -313,7 +327,7 @@ describe('users endpoint', () => {
     });
 
     it('should return error 404 if user not found', async () => {
-      const res = await request.post('/users/2/update-profile').send({
+      const res = await request.post('/users/9999/update-profile').send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
