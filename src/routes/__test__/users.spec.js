@@ -189,7 +189,7 @@ describe('users endpoint', () => {
         password: user.password,
       });
       await addUserToDB({
-        email: 'user@example.com',
+        email: 'user2@example.com',
         password: user.password,
       });
       await addUserToDB({
@@ -223,7 +223,7 @@ describe('users endpoint', () => {
       await loginUser();
     });
 
-    it('should update user profile (all available fields)', async () => {
+    it('should update user profile (change all available fields)', async () => {
       const userId = await getTestUserId();
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
@@ -255,7 +255,7 @@ describe('users endpoint', () => {
       expect(userFromDB).toMatchObject(expectedUser);
     });
 
-    it('should update user profile (only email field)', async () => {
+    it('should update user profile (change only one field, email)', async () => {
       const userId = await getTestUserId();
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
