@@ -1,7 +1,7 @@
 const { validationResult } = require('express-validator');
 
 // eslint-disable-next-line consistent-return
-const handleValidationErrors = (req, res, next) => {
+const validationErrorHandler = (req, res, next) => {
   try {
     const errors = validationResult(req);
 
@@ -19,5 +19,5 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 module.exports = {
-  handleValidationErrors,
+  validationErrorHandler,
 };

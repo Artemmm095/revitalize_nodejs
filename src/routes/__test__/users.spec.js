@@ -25,13 +25,14 @@ const updatedUser = {
 
 let token;
 let expiredToken;
+let invalidToken;
 
 const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
 
 const getTestUserId = async () => {
-  const user = await db('users').first();
+  const userFromDB = await db('users').first();
 
-  return user.user_id;
+  return userFromDB.user_id;
 };
 
 const addUserToDB = async ({ email, password }) => db('users').insert({
@@ -59,6 +60,16 @@ const loginUser = async () => {
     {
       userId,
       email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '-1h',
+    },
+  );
+  invalidToken = jwt.sign(
+    {
+      userId,
+      email: 'user1com',
     },
     process.env.JWT_SECRET,
     {
@@ -168,6 +179,27 @@ describe('users endpoint', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.message).toEqual('Incorrect password');
+    });
+
+    it('should return error 400 if email is invalid', async () => {
+      const res = await request.post('/users/login').send({
+        email: 'user1examplecom',
+        password: user.password,
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('Email should be in the format `username@example.com`');
+    });
+
+    it('should return error 400 if password is invalid', async () => {
+      const res = await request.post('/users/login').send({
+        email: user.email,
+        password: 'password',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits');
     });
   });
 
@@ -295,18 +327,18 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Unauthorized user');
     });
 
-    it('should return error 401 if request has invalid token', async () => {
+    it('should return error 403 if request has invalid token', async () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
-      }).set('Authorization', 'Invalid_token');
+      }).set('Authorization', `Bearer ${invalidToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Invalid authorization token');
     });
 
-    it('should return error 401 if request has expired token', async () => {
+    it('should return error 403 if request has expired token', async () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
@@ -324,6 +356,158 @@ describe('users endpoint', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.message).toEqual('User not found');
+    });
+
+    it('should return error 400 if user with provided email already exists', async () => {
+      await addUserToDB({
+        email: 'random@example.com',
+        password: user.password,
+      });
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-profile`).send({
+        email: 'random@example.com',
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('Email is already in use');
+    });
+
+    it('should return error 400 if email is invalid', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-profile`).send({
+        email: 'user1examplecom',
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('Email should be in the format `username@example.com`');
+    });
+
+    it('should return error 400 if one ore more required fields are empty', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-profile`).send({
+        email: '',
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('One or more required fields are empty');
+    });
+  });
+
+  describe('PATCH /update-password', () => {
+    beforeEach(async () => {
+      await cleanTable();
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
+      await loginUser();
+    });
+
+    it('should change password', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Password updated');
+
+      const userFromDB = await db('users')
+        .where({ user_id: userId }).first();
+
+      const passwordMatch = await bcrypt.compare(updatedUser.password, userFromDB.password);
+
+      expect(passwordMatch).toBe(true);
+    });
+
+    it('should return error 401 if request has no token ', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Unauthorized user');
+    });
+
+    it('should return error 403 if request has invalid token', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${invalidToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Invalid authorization token');
+    });
+
+    it('should return error 403 if request has expired token', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Expired authorization token');
+    });
+
+    it('should return error 404 if user not found', async () => {
+      const res = await request.post('/users/9999/update-password').send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toEqual('User not found');
+    });
+
+    it('should return error 400 if new password is invalid', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        newPassword: 'password',
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits');
+    });
+
+    it('should return error 400 if current password is incorrect', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: 'P@ss$word2',
+        newPassword: updatedUser.password,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('Current password is incorrect');
+    });
+
+    it('should return error 400 if one or more required fields are empty', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        newPassword: '',
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('One or more required fields are empty');
     });
   });
 });
