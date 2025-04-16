@@ -1,10 +1,14 @@
 const express = require('express');
 const { usersController } = require('../controllers');
+const { asyncHandler } = require('../middleware/errorHandlers/asyncHandler');
 const { checkAuth } = require('../middleware/checkAuth');
 const { verifyPasswordResetToken } = require('../middleware/verifyPasswordResetToken');
 const { checkUserById, checkUserByEmail } = require('../middleware/checkUserExistence');
 const { validateEmail, validatePassword } = require('../middleware/validators/users');
-const { handleUniquenessConstraint } = require('../middleware/handleUniquenessConstraint');
+const {
+  emptyFieldsHandler,
+  uniquenessConstraintHandler,
+} = require('../middleware/errorHandlers/fieldsErrorHandlers');
 
 const router = express.Router();
 
@@ -12,13 +16,12 @@ router.post(
   '/create',
   validateEmail,
   validatePassword,
-  // handleUniquenessConstraint,
-  usersController.createUser,
+  asyncHandler(usersController.createUser),
 );
 
 router.get(
   '/',
-  usersController.getAllUsers,
+  asyncHandler(usersController.getAllUsers),
 );
 
 router.post(
@@ -26,7 +29,7 @@ router.post(
   validateEmail,
   validatePassword,
   checkUserByEmail,
-  usersController.loginUser,
+  asyncHandler(usersController.loginUser),
 );
 
 router.patch(
@@ -34,8 +37,7 @@ router.patch(
   checkAuth,
   checkUserById,
   validateEmail,
-  // handleUniquenessConstraint,
-  usersController.updateProfile,
+  asyncHandler(usersController.updateProfile),
 );
 
 router.patch(
@@ -43,21 +45,21 @@ router.patch(
   checkAuth,
   checkUserById,
   validatePassword,
-  usersController.updatePassword,
+  asyncHandler(usersController.updatePassword),
 );
 
 router.patch(
   '/:userId/update-avatar',
   checkAuth,
   checkUserById,
-  usersController.updateAvatar,
+  asyncHandler(usersController.updateAvatar),
 );
 
 router.post(
   '/request-password-reset',
   validateEmail,
   checkUserByEmail,
-  usersController.requestPasswordReset,
+  asyncHandler(usersController.requestPasswordReset),
 );
 
 router.patch(
@@ -65,9 +67,10 @@ router.patch(
   verifyPasswordResetToken,
   checkUserById,
   validatePassword,
-  usersController.resetPassword,
+  asyncHandler(usersController.resetPassword),
 );
 
-router.use(handleUniquenessConstraint);
+router.use(emptyFieldsHandler);
+router.use(uniquenessConstraintHandler);
 
 module.exports = router;

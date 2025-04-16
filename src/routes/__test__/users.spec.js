@@ -160,6 +160,14 @@ describe('users endpoint', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Authorization successful');
       expect(res.body).toHaveProperty('token');
+
+      const payload = jwt.verify(res.body.token, process.env.JWT_SECRET);
+
+      const userFromDB = await db('users')
+        .where({ email: user.email }).first();
+
+      expect(payload.userId).toEqual(userFromDB.user_id);
+      expect(payload.email).toEqual(userFromDB.email);
     });
 
     it('should return error 404 if user is not found by specified email', async () => {
@@ -510,4 +518,99 @@ describe('users endpoint', () => {
         .toEqual('One or more required fields are empty');
     });
   });
+
+  describe('PATCH /update-avatar', () => {
+    beforeEach(async () => {
+      await cleanTable();
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
+      await loginUser();
+    });
+
+    it('should change avatar', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Avatar updated');
+
+      const userFromDB = await db('users')
+        .where({ user_id: userId }).first();
+
+      expect(userFromDB.avatar).toEqual(updatedUser.avatar);
+    });
+
+    it('should return error 401 if request has no token ', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Unauthorized user');
+    });
+
+    it('should return error 403 if request has invalid token', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${invalidToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Invalid authorization token');
+    });
+
+    it('should return error 403 if request has expired token', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Expired authorization token');
+    });
+
+    it('should return error 404 if user not found', async () => {
+      const res = await request.post('/users/9999/update-avatar').send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toEqual('User not found');
+    });
+
+    it('should return error 400 if avatar field is empty', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('One or more required fields are empty');
+    });
+  });
+
+  describe('POST /request-password-reset', () => {
+    it('should successfully request the password reset', async () => {
+      const res = await request.post('/users/request-password-reset').send({
+        email: user.email,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('The password reset letter has been sent to your inbox');
+    });
+
+    // Check the token payload
+  });
+
+  // Add test suits for password reset and logout
 });
