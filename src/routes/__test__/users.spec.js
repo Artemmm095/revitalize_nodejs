@@ -140,6 +140,16 @@ describe('users endpoint', () => {
       expect(res.body.message)
         .toEqual('Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits');
     });
+
+    it('should return error 400 if one or more required fields are empty', async () => {
+      const res = await request.post('/users/create').send({
+        ...user,
+        email: '',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('One or more required fields are empty');
+    });
   });
 
   describe('POST /login', () => {
@@ -208,6 +218,16 @@ describe('users endpoint', () => {
       expect(res.status).toBe(400);
       expect(res.body.message)
         .toEqual('Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits');
+    });
+
+    it('should return error 400 if one or more required fields are empty', async () => {
+      const res = await request.post('/users/create').send({
+        email: '',
+        password: 'password',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('One or more required fields are empty');
     });
   });
 
@@ -609,6 +629,7 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('The password reset letter has been sent to your inbox');
     });
 
+    const payload =
     // Check the token payload
   });
 
