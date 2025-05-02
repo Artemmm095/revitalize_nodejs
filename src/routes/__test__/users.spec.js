@@ -23,9 +23,12 @@ const updatedUser = {
   country: 'US',
 };
 
-let token;
-let expiredToken;
-let invalidToken;
+let authToken;
+let expiredAuthToken;
+let invalidAuthToken;
+let passwordResetToken;
+let expiredPasswordResetToken;
+let invalidPasswordResetToken;
 
 const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
 
@@ -43,10 +46,10 @@ const addUserToDB = async ({ email, password }) => db('users').insert({
   country: 'UA',
 });
 
-const loginUser = async () => {
+const createAuthToken = async () => {
   const userId = await getTestUserId();
 
-  token = jwt.sign(
+  authToken = jwt.sign(
     {
       userId,
       email: user.email,
@@ -56,7 +59,7 @@ const loginUser = async () => {
       expiresIn: '1h',
     },
   );
-  expiredToken = jwt.sign(
+  expiredAuthToken = jwt.sign(
     {
       userId,
       email: user.email,
@@ -66,7 +69,7 @@ const loginUser = async () => {
       expiresIn: '-1h',
     },
   );
-  invalidToken = jwt.sign(
+  invalidAuthToken = jwt.sign(
     {
       userId,
       email: 'user1com',
@@ -74,6 +77,38 @@ const loginUser = async () => {
     process.env.JWT_SECRET,
     {
       expiresIn: '-1h',
+    },
+  );
+};
+
+const createPasswordResetToken = async () => {
+  const userId = await getTestUserId();
+
+  passwordResetToken = jwt.sign(
+    {
+      userId,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '15m',
+    },
+  );
+  expiredPasswordResetToken = jwt.sign(
+    {
+      userId,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '-15m',
+    },
+  );
+  invalidPasswordResetToken = jwt.sign(
+    {
+      userId: 'id',
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '-15m',
     },
   );
 };
@@ -280,7 +315,7 @@ describe('users endpoint', () => {
         email: user.email,
         password: user.password,
       });
-      await loginUser();
+      await createAuthToken();
     });
 
     it('should update user profile (change all available fields)', async () => {
@@ -291,7 +326,7 @@ describe('users endpoint', () => {
         lastName: updatedUser.lastName,
         email: updatedUser.email,
         country: updatedUser.country,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Profile updated');
@@ -320,7 +355,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Profile updated');
@@ -360,7 +395,7 @@ describe('users endpoint', () => {
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
-      }).set('Authorization', `Bearer ${invalidToken}`);
+      }).set('Authorization', `Bearer ${invalidAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Invalid authorization token');
@@ -371,7 +406,7 @@ describe('users endpoint', () => {
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
-      }).set('Authorization', `Bearer ${expiredToken}`);
+      }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Expired authorization token');
@@ -380,7 +415,7 @@ describe('users endpoint', () => {
     it('should return error 404 if user not found', async () => {
       const res = await request.post('/users/9999/update-profile').send({
         email: updatedUser.email,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
       expect(res.body.message).toEqual('User not found');
@@ -395,7 +430,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
         email: 'random@example.com',
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toEqual('Email is already in use');
@@ -406,7 +441,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
         email: 'user1examplecom',
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toEqual('Email should be in the format `username@example.com`');
@@ -417,7 +452,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-profile`).send({
         email: '',
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toEqual('One or more required fields are empty');
@@ -431,7 +466,7 @@ describe('users endpoint', () => {
         email: user.email,
         password: user.password,
       });
-      await loginUser();
+      await createAuthToken();
     });
 
     it('should change password', async () => {
@@ -440,7 +475,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Password updated');
@@ -471,7 +506,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
-      }).set('Authorization', `Bearer ${invalidToken}`);
+      }).set('Authorization', `Bearer ${invalidAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Invalid authorization token');
@@ -483,7 +518,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
-      }).set('Authorization', `Bearer ${expiredToken}`);
+      }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Expired authorization token');
@@ -493,7 +528,7 @@ describe('users endpoint', () => {
       const res = await request.post('/users/9999/update-password').send({
         currentPassword: user.password,
         password: updatedUser.password,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
       expect(res.body.message).toEqual('User not found');
@@ -505,7 +540,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         newPassword: 'password',
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message)
@@ -518,7 +553,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: 'P@ss$word2',
         newPassword: updatedUser.password,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message)
@@ -531,7 +566,7 @@ describe('users endpoint', () => {
       const res = await request.post(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         newPassword: '',
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message)
@@ -546,7 +581,7 @@ describe('users endpoint', () => {
         email: user.email,
         password: user.password,
       });
-      await loginUser();
+      await createAuthToken();
     });
 
     it('should change avatar', async () => {
@@ -554,7 +589,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Avatar updated');
@@ -581,7 +616,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
-      }).set('Authorization', `Bearer ${invalidToken}`);
+      }).set('Authorization', `Bearer ${invalidAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Invalid authorization token');
@@ -592,7 +627,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
-      }).set('Authorization', `Bearer ${expiredToken}`);
+      }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Expired authorization token');
@@ -601,7 +636,7 @@ describe('users endpoint', () => {
     it('should return error 404 if user not found', async () => {
       const res = await request.post('/users/9999/update-avatar').send({
         avatar: updatedUser.avatar,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
       expect(res.body.message).toEqual('User not found');
@@ -612,7 +647,7 @@ describe('users endpoint', () => {
 
       const res = await request.post(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
-      }).set('Authorization', `Bearer ${token}`);
+      }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toEqual('One or more required fields are empty');
@@ -627,11 +662,38 @@ describe('users endpoint', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('The password reset letter has been sent to your inbox');
+
+      const payload = jwt.verify(res.body.token, process.env.JWT_SECRET);
+
+      const userFromDB = await db('users')
+        .where({ email: user.email }).first();
+
+      expect(payload.userId).toEqual(userFromDB.user_id);
+      expect(payload.email).toEqual(userFromDB.email);
     });
 
-    const payload =
-    // Check the token payload
+    it('should return error 404 if user not found', async () => {
+      const res = await request.post('/users/request-password-reset').send({
+        email: 'nonexistentuser@example.com',
+      });
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toEqual('User not found');
+    });
+
+    it('should return error 400 if email is invalid', async () => {
+      const res = await request.post('/users/request-password-reset').send({
+        email: 'user1examplecom',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('Email should be in the format `username@example.com`');
+    });
   });
 
-  // Add test suits for password reset and logout
+  describe('POST /reset-password', () => {
+    it('should successfully reset the password', async () => {
+      //
+    });
+  });
 });
