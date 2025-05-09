@@ -108,7 +108,7 @@ const createPasswordResetToken = async () => {
     },
     process.env.JWT_SECRET,
     {
-      expiresIn: '-15m',
+      expiresIn: '15m',
     },
   );
 };
@@ -556,8 +556,20 @@ describe('users endpoint', () => {
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
+      expect(res.body.message).toEqual('Current password is incorrect');
+    });
+
+    it('should return error 400 if new password matches with the current one', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        newPassword: user.password,
+      }).set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
       expect(res.body.message)
-        .toEqual('Current password is incorrect');
+        .toEqual('New password should not match with the current one');
     });
 
     it('should return error 400 if one or more required fields are empty', async () => {
@@ -655,6 +667,14 @@ describe('users endpoint', () => {
   });
 
   describe('POST /request-password-reset', () => {
+    beforeEach(async () => {
+      await cleanTable();
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
+    });
+
     it('should successfully request the password reset', async () => {
       const res = await request.post('/users/request-password-reset').send({
         email: user.email,
@@ -692,8 +712,75 @@ describe('users endpoint', () => {
   });
 
   describe('POST /reset-password', () => {
-    it('should successfully reset the password', async () => {
-      //
+    beforeEach(async () => {
+      await cleanTable();
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
+      await createPasswordResetToken();
     });
+
+    it('should reset the password', async () => {
+      const userId = await getTestUserId();
+
+      const res = await request.post('/users/reset-password').send({
+        password: updatedUser.password,
+      }).set('Authorization', passwordResetToken);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Password has been successfully reset');
+
+      const userFromDB = await db('users')
+        .where({ user_id: userId }).first();
+
+      const passwordMatch = await bcrypt.compare(updatedUser.password, userFromDB.password);
+
+      expect(passwordMatch).toBe(true);
+    });
+
+    it('should return error 401 if request has no token', async () => {
+      const res = await request.post('/users/reset-password').send({
+        password: updatedUser.password,
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('No permission');
+    });
+
+    it('should return error 403 if request has invalid token', async () => {
+      const res = await request.post('/users/reset-password').send({
+        password: updatedUser.password,
+      }).set('Authorization', invalidPasswordResetToken);
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Invalid password reset token');
+    });
+
+    it('should return error 403 if request has expired token', async () => {
+      const res = await request.post('/users/reset-password').send({
+        password: updatedUser.password,
+      }).set('Authorization', expiredPasswordResetToken);
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Expired password reset token');
+    });
+
+    it('should return error 404 if user not found', async () => {
+      const userId = await getTestUserId();
+
+      await db('users')
+        .where({ user_id: userId })
+        .delete();
+
+      const res = await request.post('/users/reset-password').send({
+        password: updatedUser.password,
+      }).set('Authorization', passwordResetToken);
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toEqual('User not found');
+    });
+
+    //
   });
 });

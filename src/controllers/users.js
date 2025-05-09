@@ -100,11 +100,17 @@ const updatePassword = async (req, res) => {
 
   const user = await db.users.getById(userId);
 
-  const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+  const currentPasswordMatch = await bcrypt.compare(currentPassword, user.password);
+  const newPasswordMatch = await bcrypt.compare(newPassword, user.password);
 
-  if (!passwordMatch) {
+  if (!currentPasswordMatch) {
     return res.status(400)
       .json({ message: 'Current password is incorrect' });
+  }
+
+  if (newPasswordMatch) {
+    return res.status(400)
+      .json({ message: 'New password should not match with the current one' });
   }
 
   await db.users.updatePassword({
