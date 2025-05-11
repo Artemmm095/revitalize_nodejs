@@ -753,7 +753,7 @@ describe('users endpoint', () => {
         password: updatedUser.password,
       }).set('Authorization', invalidPasswordResetToken);
 
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Invalid password reset token');
     });
 
@@ -762,7 +762,7 @@ describe('users endpoint', () => {
         password: updatedUser.password,
       }).set('Authorization', expiredPasswordResetToken);
 
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Expired password reset token');
     });
 
