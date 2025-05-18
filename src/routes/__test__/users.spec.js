@@ -30,7 +30,7 @@ let passwordResetToken;
 let expiredPasswordResetToken;
 let invalidPasswordResetToken;
 
-const cleanTable = async () => db.raw('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
+const cleanTable = async (table) => db.raw('TRUNCATE TABLE ?? RESTART IDENTITY CASCADE', [table]);
 
 const getTestUserId = async () => {
   const userFromDB = await db('users').first();
@@ -116,7 +116,7 @@ const createPasswordResetToken = async () => {
 describe('users endpoint', () => {
   describe('POST /create', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
     });
 
     it('should register a user', async () => {
@@ -189,7 +189,7 @@ describe('users endpoint', () => {
 
   describe('POST /login', () => {
     beforeAll(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -268,7 +268,7 @@ describe('users endpoint', () => {
 
   describe('GET /', () => {
     beforeAll(async () => {
-      await cleanTable();
+      await cleanTable(users);
     });
 
     it('should return error 404 if users not found', async () => {
@@ -310,7 +310,7 @@ describe('users endpoint', () => {
 
   describe('PATCH /update-profile', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -461,7 +461,7 @@ describe('users endpoint', () => {
 
   describe('PATCH /update-password', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -588,7 +588,7 @@ describe('users endpoint', () => {
 
   describe('PATCH /update-avatar', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -668,7 +668,7 @@ describe('users endpoint', () => {
 
   describe('POST /request-password-reset', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
@@ -713,7 +713,7 @@ describe('users endpoint', () => {
 
   describe('POST /reset-password', () => {
     beforeEach(async () => {
-      await cleanTable();
+      await cleanTable('users');
       await addUserToDB({
         email: user.email,
         password: user.password,
