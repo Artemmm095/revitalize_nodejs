@@ -781,6 +781,28 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('User not found');
     });
 
+    it('should return error 400 if password is invalid', async () => {
+      const res = await request.post('/users/reset-password').send({
+        password: 'password',
+      }).set('Authorization', passwordResetToken);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('Password should be 6 - 12 characters, contain uppercase and lowercase letters, special characters and digits');
+    });
+
+    it('should return error 400 if password field is empty', async () => {
+      const res = await request.post('/users/reset-password').send({
+        password: '',
+      }).set('Authorization', passwordResetToken);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message)
+        .toEqual('One or more required fields are empty');
+    });
+  });
+
+  describe('POST /logout', () => {
     //
   });
 });

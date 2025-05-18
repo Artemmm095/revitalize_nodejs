@@ -70,6 +70,12 @@ router.patch(
   asyncHandler(usersController.resetPassword),
 );
 
+router.post(
+  '/logout',
+  checkAuth,
+  asyncHandler(usersController.logout),
+);
+
 router.use(emptyFieldsHandler);
 router.use(uniquenessConstraintHandler);
 

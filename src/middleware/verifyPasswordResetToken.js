@@ -15,7 +15,7 @@ const verifyPasswordResetToken = (req, res, next) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
         return res.status(403)
-          .json({ message: 'Expired password reset token' });
+          .json({ message: 'Password reset token is no longer available' });
       }
       if (err.name === 'JsonWebTokenError') {
         return res.status(403)

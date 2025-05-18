@@ -38,6 +38,8 @@ const updateAvatar = (data) => db('users')
     avatar: data.avatar,
   });
 
+const revokeToken = (data) => db('revoked_tokens').insert(data);
+
 module.exports = {
   create,
   getAll,
@@ -46,4 +48,5 @@ module.exports = {
   updateProfile,
   updatePassword,
   updateAvatar,
+  revokeToken,
 };

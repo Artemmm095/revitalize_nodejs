@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../database');
 const { sendEmail } = require('../utils/emailService');
+const { extractToken } = require('../utils/extractToken');
 
 // eslint-disable-next-line consistent-return
 const createUser = async (req, res) => {
@@ -189,6 +190,15 @@ const resetPassword = async (req, res) => {
     .json({ message: 'Password has been successfully reset' });
 };
 
+const logout = async (req, res) => {
+  const token = extractToken(req);
+
+  await db.users.revokeToken(token);
+
+  return res.status(200)
+    .json({ message: 'Logout successful' });
+};
+
 module.exports = {
   getAllUsers,
   createUser,
@@ -198,4 +208,5 @@ module.exports = {
   updateAvatar,
   requestPasswordReset,
   resetPassword,
+  logout,
 };
