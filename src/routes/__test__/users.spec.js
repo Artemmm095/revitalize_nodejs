@@ -803,6 +803,29 @@ describe('users endpoint', () => {
   });
 
   describe('POST /logout', () => {
-    //
+    beforeEach(async () => {
+      await cleanTable('users');
+      await cleanTable('revoked_tokens');
+      await addUserToDB({
+        email: user.email,
+        password: user.password,
+      });
+      await createAuthToken();
+    });
+
+    it('should successfully revoke the authorization token', async () => {
+      const res = await request.post('/users/logout')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toEqual('Logout successful');
+
+      const token = req.headers.authorization.split(' ')[1];
+
+      const isRevoked = await db('revoked_tokens')
+        .where({ token }).first();
+
+      expect(isRevoked).toBe(true);
+    });
   });
 });
