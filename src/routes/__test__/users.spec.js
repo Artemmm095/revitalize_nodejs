@@ -268,7 +268,7 @@ describe('users endpoint', () => {
 
   describe('GET /', () => {
     beforeAll(async () => {
-      await cleanTable(users);
+      await cleanTable('users');
     });
 
     it('should return error 404 if users not found', async () => {
@@ -379,7 +379,7 @@ describe('users endpoint', () => {
       expect(userFromDB).toMatchObject(expectedUser);
     });
 
-    it('should return error 401 if request has no token', async () => {
+    it('should return error 401 if authorization token is missing', async () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
@@ -390,7 +390,7 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Unauthorized user');
     });
 
-    it('should return error 403 if request has invalid token', async () => {
+    it('should return error 403 if authorization token is invalid', async () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
@@ -401,7 +401,7 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Invalid authorization token');
     });
 
-    it('should return error 403 if request has expired token', async () => {
+    it('should return error 403 if authorization token is expired', async () => {
       const userId = await getTestUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
@@ -409,7 +409,20 @@ describe('users endpoint', () => {
       }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
-      expect(res.body.message).toEqual('Expired authorization token');
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+    });
+
+    it('should return error 403 if authorization token is revoked', async () => {
+      it('should return error 403 if authorization token is expired', async () => {
+        const userId = await getTestUserId();
+
+        const res = await request.patch(`/users/${userId}/update-profile`).send({
+          email: updatedUser.email,
+        }).set('Authorization', `Bearer ${/**/}`);
+
+        expect(res.status).toBe(403);
+        expect(res.body.message).toEqual('Authorization token is no longer available');
+      });
     });
 
     it('should return error 404 if user not found', async () => {
@@ -820,12 +833,43 @@ describe('users endpoint', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toEqual('Logout successful');
 
-      const token = req.headers.authorization.split(' ')[1];
-
       const isRevoked = await db('revoked_tokens')
-        .where({ token }).first();
+        .where({ token: authToken }).first();
 
-      expect(isRevoked).toBe(true);
+      expect(isRevoked).not.toBeNull();
     });
+
+    it('should return error 401 if request has no token', async () => {
+      const res = await request.post('/users/logout');
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('Unauthorized user');
+    });
+
+    it('should return error 403 if request has invalid token', async () => {
+      const res = await request.post('/users/logout')
+        .set('Authorization', `Bearer ${invalidAuthToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Invalid authorization token');
+    });
+
+    it('should return error 403 if request has expired token', async () => {
+      const res = await request.post('/users/logout')
+        .set('Authorization', `Bearer ${invalidAuthToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+    });
+
+    it('should return error 403 if token is already revoked', async () => {
+      const res = await request.post('/users/logout')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+    });
+
+    //
   });
 });
