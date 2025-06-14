@@ -32,7 +32,7 @@ let invalidPasswordResetToken;
 
 const cleanTable = async (table) => db.raw('TRUNCATE TABLE ?? RESTART IDENTITY CASCADE', [table]);
 
-const getTestUserId = async () => {
+const getUserId = async () => {
   const userFromDB = await db('users').first();
 
   return userFromDB.user_id;
@@ -47,7 +47,7 @@ const addUserToDB = async ({ email, password }) => db('users').insert({
 });
 
 const createAuthToken = async () => {
-  const userId = await getTestUserId();
+  const userId = await getUserId();
 
   authToken = jwt.sign(
     {
@@ -72,17 +72,36 @@ const createAuthToken = async () => {
   invalidAuthToken = jwt.sign(
     {
       userId,
-      email: 'user1com',
+      email: user.email,
     },
-    process.env.JWT_SECRET,
+    'wrong_jwt_secret',
     {
-      expiresIn: '-1h',
+      expiresIn: '1h',
     },
   );
 };
 
+const createRevokedAuthToken = async () => {
+  const userId = await getUserId();
+
+  const token = jwt.sign(
+    {
+      userId,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '1h',
+    },
+  );
+
+  await db('revoked_tokens').insert({ token });
+
+  return token;
+};
+
 const createPasswordResetToken = async () => {
-  const userId = await getTestUserId();
+  const userId = await getUserId();
 
   passwordResetToken = jwt.sign(
     {
@@ -104,9 +123,9 @@ const createPasswordResetToken = async () => {
   );
   invalidPasswordResetToken = jwt.sign(
     {
-      userId: 'id',
+      userId,
     },
-    process.env.JWT_SECRET,
+    'wrong_jwt_secret',
     {
       expiresIn: '15m',
     },
@@ -129,15 +148,16 @@ describe('users endpoint', () => {
         'first_name as firstName',
         'last_name as lastName',
         'email',
+        'country',
       )
         .from('users')
         .where('email', user.email).first();
 
       const expectedUser = {
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
-        email: updatedUser.email,
-        country: updatedUser.country,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        country: user.country,
       };
 
       expect(userFromDB).toMatchObject(expectedUser);
@@ -256,7 +276,7 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if one or more required fields are empty', async () => {
-      const res = await request.post('/users/create').send({
+      const res = await request.post('/users/login').send({
         email: '',
         password: 'password',
       });
@@ -319,9 +339,9 @@ describe('users endpoint', () => {
     });
 
     it('should update user profile (change all available fields)', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-profile`).send({
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         email: updatedUser.email,
@@ -350,11 +370,11 @@ describe('users endpoint', () => {
       expect(userFromDB).toMatchObject(expectedUser);
     });
 
-    it('should update user profile (change only one field, email)', async () => {
-      const userId = await getTestUserId();
+    it('should update user profile (change only one field, firstName)', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-profile`).send({
-        email: updatedUser.email,
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
+        firstName: updatedUser.firstName,
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
@@ -370,9 +390,9 @@ describe('users endpoint', () => {
         .where('user_id', userId).first();
 
       const expectedUser = {
-        firstName: user.firstName,
+        firstName: updatedUser.firstName,
         lastName: user.lastName,
-        email: updatedUser.email,
+        email: user.email,
         country: user.country,
       };
 
@@ -380,7 +400,7 @@ describe('users endpoint', () => {
     });
 
     it('should return error 401 if authorization token is missing', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
@@ -391,7 +411,7 @@ describe('users endpoint', () => {
     });
 
     it('should return error 403 if authorization token is invalid', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
@@ -402,7 +422,7 @@ describe('users endpoint', () => {
     });
 
     it('should return error 403 if authorization token is expired', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
       const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: updatedUser.email,
@@ -413,20 +433,21 @@ describe('users endpoint', () => {
     });
 
     it('should return error 403 if authorization token is revoked', async () => {
-      it('should return error 403 if authorization token is expired', async () => {
-        const userId = await getTestUserId();
+      const userId = await getUserId();
+      const revokedAuthToken = await createRevokedAuthToken();
 
-        const res = await request.patch(`/users/${userId}/update-profile`).send({
-          email: updatedUser.email,
-        }).set('Authorization', `Bearer ${/**/}`);
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
+        email: updatedUser.email,
+      }).set('Authorization', `Bearer ${revokedAuthToken}`);
 
-        expect(res.status).toBe(403);
-        expect(res.body.message).toEqual('Authorization token is no longer available');
-      });
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+
+      await cleanTable('revoked_tokens');
     });
 
     it('should return error 404 if user not found', async () => {
-      const res = await request.post('/users/9999/update-profile').send({
+      const res = await request.patch('/users/9999/update-profile').send({
         email: updatedUser.email,
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -434,14 +455,28 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('User not found');
     });
 
+    it('should return error 401 if user tries to update another user`s profile', async () => {
+      await addUserToDB({
+        email: 'user2@example.com',
+        password: user.password,
+      });
+
+      const res = await request.patch('/users/2/update-profile').send({
+        email: updatedUser.email,
+      }).set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('No permission');
+    });
+
     it('should return error 400 if user with provided email already exists', async () => {
       await addUserToDB({
         email: 'random@example.com',
         password: user.password,
       });
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-profile`).send({
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: 'random@example.com',
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -450,9 +485,9 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if email is invalid', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-profile`).send({
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: 'user1examplecom',
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -461,9 +496,9 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if one ore more required fields are empty', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-profile`).send({
+      const res = await request.patch(`/users/${userId}/update-profile`).send({
         email: '',
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -483,9 +518,9 @@ describe('users endpoint', () => {
     });
 
     it('should change password', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
       }).set('Authorization', `Bearer ${authToken}`);
@@ -501,10 +536,10 @@ describe('users endpoint', () => {
       expect(passwordMatch).toBe(true);
     });
 
-    it('should return error 401 if request has no token ', async () => {
-      const userId = await getTestUserId();
+    it('should return error 401 if authorization token is missing', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
       });
@@ -513,10 +548,10 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Unauthorized user');
     });
 
-    it('should return error 403 if request has invalid token', async () => {
-      const userId = await getTestUserId();
+    it('should return error 403 if authorization token is invalid', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
       }).set('Authorization', `Bearer ${invalidAuthToken}`);
@@ -525,20 +560,35 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Invalid authorization token');
     });
 
-    it('should return error 403 if request has expired token', async () => {
-      const userId = await getTestUserId();
+    it('should return error 403 if authorization token is expired', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
         password: updatedUser.password,
       }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
-      expect(res.body.message).toEqual('Expired authorization token');
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+    });
+
+    it('should return error 403 if authorization token is revoked', async () => {
+      const userId = await getUserId();
+      const revokedAuthToken = await createRevokedAuthToken();
+
+      const res = await request.patch(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${revokedAuthToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+
+      await cleanTable('revoked_tokens');
     });
 
     it('should return error 404 if user not found', async () => {
-      const res = await request.post('/users/9999/update-password').send({
+      const res = await request.patch('/users/9999/update-password').send({
         currentPassword: user.password,
         password: updatedUser.password,
       }).set('Authorization', `Bearer ${authToken}`);
@@ -547,12 +597,27 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('User not found');
     });
 
-    it('should return error 400 if new password is invalid', async () => {
-      const userId = await getTestUserId();
+    it('should return error 401 if user tries to update another user`s password', async () => {
+      await addUserToDB({
+        email: 'user2@example.com',
+        password: 'usEr1%1',
+      });
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch('/users/2/update-password').send({
         currentPassword: user.password,
-        newPassword: 'password',
+        password: updatedUser.password,
+      }).set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('No permission');
+    });
+
+    it('should return error 400 if new password is invalid', async () => {
+      const userId = await getUserId();
+
+      const res = await request.patch(`/users/${userId}/update-password`).send({
+        currentPassword: user.password,
+        password: 'password',
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -561,11 +626,11 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if current password is incorrect', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: 'P@ss$word2',
-        newPassword: updatedUser.password,
+        password: updatedUser.password,
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -573,11 +638,11 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if new password matches with the current one', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
-        newPassword: user.password,
+        password: user.password,
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -586,11 +651,11 @@ describe('users endpoint', () => {
     });
 
     it('should return error 400 if one or more required fields are empty', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-password`).send({
+      const res = await request.patch(`/users/${userId}/update-password`).send({
         currentPassword: user.password,
-        newPassword: '',
+        password: '',
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -610,9 +675,9 @@ describe('users endpoint', () => {
     });
 
     it('should change avatar', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-avatar`).send({
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -625,10 +690,10 @@ describe('users endpoint', () => {
       expect(userFromDB.avatar).toEqual(updatedUser.avatar);
     });
 
-    it('should return error 401 if request has no token ', async () => {
-      const userId = await getTestUserId();
+    it('should return error 401 if authorization token is missing', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-avatar`).send({
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
       });
 
@@ -636,10 +701,10 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Unauthorized user');
     });
 
-    it('should return error 403 if request has invalid token', async () => {
-      const userId = await getTestUserId();
+    it('should return error 403 if authorization token is invalid', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-avatar`).send({
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
       }).set('Authorization', `Bearer ${invalidAuthToken}`);
 
@@ -647,19 +712,33 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Invalid authorization token');
     });
 
-    it('should return error 403 if request has expired token', async () => {
-      const userId = await getTestUserId();
+    it('should return error 403 if authorization token is expired', async () => {
+      const userId = await getUserId();
 
-      const res = await request.post(`/users/${userId}/update-avatar`).send({
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
         avatar: updatedUser.avatar,
       }).set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
-      expect(res.body.message).toEqual('Expired authorization token');
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+    });
+
+    it('should return error 403 authorization token is revoked', async () => {
+      const userId = await getUserId();
+      const revokedAuthToken = await createRevokedAuthToken();
+
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
+        avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${revokedAuthToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toEqual('Authorization token is no longer available');
+
+      await cleanTable('revoked_tokens');
     });
 
     it('should return error 404 if user not found', async () => {
-      const res = await request.post('/users/9999/update-avatar').send({
+      const res = await request.patch('/users/9999/update-avatar').send({
         avatar: updatedUser.avatar,
       }).set('Authorization', `Bearer ${authToken}`);
 
@@ -667,11 +746,25 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('User not found');
     });
 
-    it('should return error 400 if avatar field is empty', async () => {
-      const userId = await getTestUserId();
+    it('should return error 401 if user tries to update another user`s avatar', async () => {
+      await addUserToDB({
+        email: 'user2@example.com',
+        password: user.password,
+      });
 
-      const res = await request.post(`/users/${userId}/update-avatar`).send({
+      const res = await request.patch('/users/2/update-avatar').send({
         avatar: updatedUser.avatar,
+      }).set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toEqual('No permission');
+    });
+
+    it('should return error 400 if avatar field is empty', async () => {
+      const userId = await getUserId();
+
+      const res = await request.patch(`/users/${userId}/update-avatar`).send({
+        avatar: '',
       }).set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -702,7 +795,6 @@ describe('users endpoint', () => {
         .where({ email: user.email }).first();
 
       expect(payload.userId).toEqual(userFromDB.user_id);
-      expect(payload.email).toEqual(userFromDB.email);
     });
 
     it('should return error 404 if user not found', async () => {
@@ -735,7 +827,7 @@ describe('users endpoint', () => {
     });
 
     it('should reset the password', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
       const res = await request.post('/users/reset-password').send({
         password: updatedUser.password,
@@ -752,7 +844,7 @@ describe('users endpoint', () => {
       expect(passwordMatch).toBe(true);
     });
 
-    it('should return error 401 if request has no token', async () => {
+    it('should return error 401 if password reset token is missing', async () => {
       const res = await request.post('/users/reset-password').send({
         password: updatedUser.password,
       });
@@ -761,7 +853,7 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('No permission');
     });
 
-    it('should return error 403 if request has invalid token', async () => {
+    it('should return error 403 if password reset token is invalid', async () => {
       const res = await request.post('/users/reset-password').send({
         password: updatedUser.password,
       }).set('Authorization', invalidPasswordResetToken);
@@ -770,17 +862,17 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Invalid password reset token');
     });
 
-    it('should return error 403 if request has expired token', async () => {
+    it('should return error 403 if password reset token is expired', async () => {
       const res = await request.post('/users/reset-password').send({
         password: updatedUser.password,
       }).set('Authorization', expiredPasswordResetToken);
 
       expect(res.status).toBe(403);
-      expect(res.body.message).toEqual('Expired password reset token');
+      expect(res.body.message).toEqual('Password reset token is no longer available');
     });
 
     it('should return error 404 if user not found', async () => {
-      const userId = await getTestUserId();
+      const userId = await getUserId();
 
       await db('users')
         .where({ user_id: userId })
@@ -839,14 +931,14 @@ describe('users endpoint', () => {
       expect(isRevoked).not.toBeNull();
     });
 
-    it('should return error 401 if request has no token', async () => {
+    it('should return error 401 if authorization token is missing', async () => {
       const res = await request.post('/users/logout');
 
       expect(res.status).toBe(401);
       expect(res.body.message).toEqual('Unauthorized user');
     });
 
-    it('should return error 403 if request has invalid token', async () => {
+    it('should return error 403 if authorization token is invalid', async () => {
       const res = await request.post('/users/logout')
         .set('Authorization', `Bearer ${invalidAuthToken}`);
 
@@ -854,22 +946,22 @@ describe('users endpoint', () => {
       expect(res.body.message).toEqual('Invalid authorization token');
     });
 
-    it('should return error 403 if request has expired token', async () => {
+    it('should return error 403 if authorization token is expired', async () => {
       const res = await request.post('/users/logout')
-        .set('Authorization', `Bearer ${invalidAuthToken}`);
+        .set('Authorization', `Bearer ${expiredAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Authorization token is no longer available');
     });
 
     it('should return error 403 if token is already revoked', async () => {
+      const revokedAuthToken = await createRevokedAuthToken();
+
       const res = await request.post('/users/logout')
-        .set('Authorization', `Bearer ${authToken}`);
+        .set('Authorization', `Bearer ${revokedAuthToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toEqual('Authorization token is no longer available');
     });
-
-    //
   });
 });

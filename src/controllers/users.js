@@ -96,13 +96,13 @@ const updateProfile = async (req, res) => {
 };
 
 const updatePassword = async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
+  const { currentPassword, password } = req.body;
   const { userId } = req.params;
 
   const user = await db.users.getById(userId);
 
   const currentPasswordMatch = await bcrypt.compare(currentPassword, user.password);
-  const newPasswordMatch = await bcrypt.compare(newPassword, user.password);
+  const newPasswordMatch = await bcrypt.compare(password, user.password);
 
   if (!currentPasswordMatch) {
     return res.status(400)
@@ -116,7 +116,7 @@ const updatePassword = async (req, res) => {
 
   await db.users.updatePassword({
     userId,
-    password: await bcrypt.hash(newPassword, 10),
+    password: await bcrypt.hash(password, 10),
   });
 
   return res.status(200)
@@ -159,6 +159,7 @@ const requestPasswordReset = async (req, res) => {
   If you didn’t request a password reset, ignore this email.`;
 
   const htmlMessage = `
+  <p>Revitalize Fitness App</p>
   <p>Follow the link below to reset your password:</p>
   <p><a href="${passwordResetLink}">${passwordResetLink}</a></p>
   <p>If you didn’t request a password reset, ignore this email.</p>`;

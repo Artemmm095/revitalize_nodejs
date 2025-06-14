@@ -13,7 +13,7 @@ const checkAuth = async (req, res, next) => {
 
   const isRevoked = await db('revoked_tokens')
     .where({ token }).first();
-  if (!isRevoked) {
+  if (isRevoked) {
     return res.status(403).json({ message: 'Authorization token is no longer available' });
   }
 

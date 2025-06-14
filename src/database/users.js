@@ -38,7 +38,9 @@ const updateAvatar = (data) => db('users')
     avatar: data.avatar,
   });
 
-const revokeToken = (data) => db('revoked_tokens').insert(data);
+const revokeToken = (data) => db('revoked_tokens').insert({
+  token: data,
+});
 
 module.exports = {
   create,
