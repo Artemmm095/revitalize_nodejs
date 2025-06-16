@@ -30,7 +30,6 @@ const updatePassword = (data) => db('users')
   .where({ user_id: data.userId })
   .update({
     password: data.password,
-const getAll = () => db('users');
   });
 
 const updateAvatar = (data) => db('users')

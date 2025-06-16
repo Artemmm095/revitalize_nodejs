@@ -5,10 +5,14 @@ const create = (data) => db('workouts').insert({
   activity_id: data.activityId,
   title: data.title,
   commentary: data.commentary,
-  duration: data.duratuon,
-}).returning('*');
+  duration: data.duration,
+});
 
-const insertMetrics = (data) => db('workouts_metrics').insert({});
+const insertMetrics = (data) => db('workouts_metrics').insert({
+  workout_id: data.workoutId,
+  metric_id: data.metricId,
+  metric_value: data.metricValue,
+});
 
 const getWorkout = (workoutId) => db('workouts')
   .where({ 'workout_id': workoutId });
