@@ -14,6 +14,11 @@ exports.up = (knex) => knex.schema
     table.text('avatar');
     table.timestamps(true, true);
   })
+  .createTable('revoked_tokens', (table) => {
+    table.increments('token_id');
+    table.text('token').notNullable();
+    table.timestamp('revoked_at').defaultTo(knex.fn.now());
+  })
   .createTable('activities', (table) => {
     table.increments('activity_id');
     table.string('name').notNullable().unique();
@@ -73,4 +78,5 @@ exports.down = (knex) => knex.schema
   .dropTable('activities_metrics')
   .dropTable('activities')
   .dropTable('metrics')
+  .dropTable('revoked_tokens')
   .dropTable('users');
