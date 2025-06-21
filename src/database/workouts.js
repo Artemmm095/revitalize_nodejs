@@ -14,38 +14,39 @@ const insertMetrics = (data) => db('workouts_metrics').insert({
   metric_value: data.metricValue,
 });
 
-const getWorkout = (workoutId) => db('workouts')
-  .where({ 'workout_id': workoutId });
-
-// const update = (data) => db('workouts').update({});
-const update = (data) => db.raw(
-  `UPDATE workouts
-     SET title = :title,
-       commentary = :commentary,
-       duration = :duration,
-       updated_at = NOW()
-     WHERE workout_id = :workoutId`
-{
-  title: data.title,
-    commentary: data.commentary,
-  duration: data.duration,
-  workoutId: data.workoutId,
-},
-);
-
-// const updateMetric =
-
-const getAllByLatest = (userId) => db('workouts')
-  .where({ 'user_id': userId })
-  .orderBy('created_at', desc);
-const getAllByOldest = (userId) => db('workouts')
-  .where({ 'user_id': userId })
-  .orderBy('created_at');
+// const getWorkout = (workoutId) => db('workouts')
+//   .where({ 'workout_id': workoutId });
+//
+// // const update = (data) => db('workouts').update({});
+// const update = (data) => db.raw(
+//   `UPDATE workouts
+//      SET title = :title,
+//        commentary = :commentary,
+//        duration = :duration,
+//        updated_at = NOW()
+//      WHERE workout_id = :workoutId`
+// {
+//   title: data.title,
+//     commentary: data.commentary,
+//   duration: data.duration,
+//   workoutId: data.workoutId,
+// },
+// );
+//
+// // const updateMetric =
+//
+// const getAllByLatest = (userId) => db('workouts')
+//   .where({ 'user_id': userId })
+//   .orderBy('created_at', desc);
+// const getAllByOldest = (userId) => db('workouts')
+//   .where({ 'user_id': userId })
+//   .orderBy('created_at');
 
 module.exports = {
   create,
-  getWorkout,
-  update,
-  getAllByLatest,
-  getAllByOldest,
+  insertMetrics,
+  // getWorkout,
+  // update,
+  // getAllByLatest,
+  // getAllByOldest,
 };
