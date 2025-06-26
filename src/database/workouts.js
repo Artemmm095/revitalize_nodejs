@@ -1,18 +1,23 @@
 const { db } = require('./db');
 
-const create = (data) => db('workouts').insert({
+const insertActivityType = (data) => db('workouts').insert({
   user_id: data.userId,
   activity_id: data.activityId,
-  title: data.title,
-  commentary: data.commentary,
-  duration: data.duration,
 });
 
-const insertMetrics = (data) => db('workouts_metrics').insert({
-  workout_id: data.workoutId,
-  metric_id: data.metricId,
-  metric_value: data.metricValue,
-});
+const create = (data) => {
+  db('workouts').insert({
+    title: data.title,
+    commentary: data.commentary,
+    duration: data.duration,
+  }).where('user_id', data.userId);
+
+  db('workouts_metrics').insert({
+    workout_id: data.workoutId,
+    metric_id: data.metricId,
+    metric_value: data.metricValue,
+  });
+};
 
 // const getWorkout = (workoutId) => db('workouts')
 //   .where({ 'workout_id': workoutId });
@@ -43,8 +48,8 @@ const insertMetrics = (data) => db('workouts_metrics').insert({
 //   .orderBy('created_at');
 
 module.exports = {
+  insertActivityType,
   create,
-  insertMetrics,
   // getWorkout,
   // update,
   // getAllByLatest,

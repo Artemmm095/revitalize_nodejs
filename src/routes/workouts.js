@@ -8,11 +8,16 @@ const { validateRequiredFields } = require('../middleware/validators/users');
 const router = express.Router();
 
 router.post(
-  '/create',
+  'select-activity',
   checkAuth,
-  checkUserById,
-  validateRequiredFields(['activity_id', 'duration']),
-  asyncHandler(workoutsController.createWorkout),
 );
+
+// router.post(
+//   '/create',
+//   checkAuth,
+//   checkUserById,
+//   validateRequiredFields(['activity_id', 'duration']),
+//   asyncHandler(workoutsController.createWorkout),
+// );
 
 module.exports = router;
