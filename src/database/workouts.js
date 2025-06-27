@@ -5,23 +5,25 @@ const insertActivityType = (data) => db('workouts').insert({
   activity_id: data.activityId,
 });
 
-const create = (data) => {
-  db('workouts').insert({
+const insertConstantWorkoutData = (data) => db('workouts')
+  .where({ workout_id: data.workoutId })
+  .insert({
     title: data.title,
     commentary: data.commentary,
     duration: data.duration,
-  }).where('user_id', data.userId);
+  });
 
-  db('workouts_metrics').insert({
+const insertSpecificMetrics = (data) => db('workouts_metrics')
+  .where({ user_id: data.userId })
+  .insert({
     workout_id: data.workoutId,
     metric_id: data.metricId,
     metric_value: data.metricValue,
   });
-};
 
-// const getWorkout = (workoutId) => db('workouts')
-//   .where({ 'workout_id': workoutId });
-//
+const getWorkout = (workoutId) => db('workouts')
+  .where({ workout_id: workoutId });
+
 // // const update = (data) => db('workouts').update({});
 // const update = (data) => db.raw(
 //   `UPDATE workouts
@@ -49,8 +51,9 @@ const create = (data) => {
 
 module.exports = {
   insertActivityType,
-  create,
-  // getWorkout,
+  insertConstantWorkoutData,
+  insertSpecificMetrics,
+  getWorkout,
   // update,
   // getAllByLatest,
   // getAllByOldest,

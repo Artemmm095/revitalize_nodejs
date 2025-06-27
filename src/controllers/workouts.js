@@ -1,15 +1,24 @@
 const db = require('../database');
 
-const selectActivity = async (req, res) => {
-  const { activityId } = req.body;
+const createWorkout = async (req, res) => {
+  const {
+    activityId,
+    title,
+    commentary,
+    duration,
+    metricValue,
+  } = req.body;
   const { userId } = req.user;
 
   await db.workouts.insertActivityType({
     userId,
     activityId,
   });
+  
+  /// const workout = await db.workouts.getWorkout()
 
-  return res.status(200);
+  return res.status(201)
+    .json({ message: 'Workout created' });
 };
 
 // const createWorkout = async (req, res) => {
