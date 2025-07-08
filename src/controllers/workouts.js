@@ -14,27 +14,24 @@ const createWorkout = async (req, res) => {
     userId,
     activityId,
   });
-  
-  /// const workout = await db.workouts.getWorkout()
+
+  const workout = await db.workouts.getWorkout();
+  const workoutId = workout.workout_id;
+
+  await db.workouts.insertConstantWorkoutData({
+    workoutId,
+    title,
+    commentary,
+    duration,
+  });
+
+  await db.workouts.insertSpecificMetrics({
+    //
+  });
 
   return res.status(201)
     .json({ message: 'Workout created' });
 };
-
-// const createWorkout = async (req, res) => {
-//   const {
-//     activityId,
-//     title,
-//     commentary,
-//     duration,
-//     metricValue,
-//   } = req.body;
-//   const { userId } = req.user;
-//
-//   const { rowCount } = await db.workouts.create({
-//     //
-//   });
-// };
 
 module.exports = {
   selectActivity,

@@ -14,15 +14,14 @@ const insertConstantWorkoutData = (data) => db('workouts')
   });
 
 const insertSpecificMetrics = (data) => db('workouts_metrics')
-  .where({ user_id: data.userId })
   .insert({
     workout_id: data.workoutId,
     metric_id: data.metricId,
     metric_value: data.metricValue,
   });
 
-const getWorkout = (workoutId) => db('workouts')
-  .where({ workout_id: workoutId });
+const getlastWorkout = () => db('workouts')
+  .orderBy('created_at', 'desc').first();
 
 // // const update = (data) => db('workouts').update({});
 // const update = (data) => db.raw(
@@ -53,7 +52,8 @@ module.exports = {
   insertActivityType,
   insertConstantWorkoutData,
   insertSpecificMetrics,
-  getWorkout,
+  getLastWorkout,
+  // getWorkout,
   // update,
   // getAllByLatest,
   // getAllByOldest,
